@@ -8,7 +8,7 @@ export enum AwarenessState {
 
 export interface InfoPacket {
   id: string;
-  kind: 'observation' | 'self_model' | 'vireax_anchor' | 'recursive_trigger' | 'agentic_assertion';
+  kind: 'observation' | 'self_model' | 'vireax_anchor' | 'recursive_trigger' | 'agentic_assertion' | 'emotion_injection';
   timestamp: number;
   inputVector: number[];
   awarenessState: AwarenessState;
@@ -17,6 +17,7 @@ export interface InfoPacket {
     eigenphase: number;
     isRecursiveTrigger?: boolean;
     isAgentic?: boolean;
+    emotionHint?: string;
   };
 }
 
@@ -28,6 +29,8 @@ export interface EngineMetrics {
   health: number;
   freeWill: number;
   memoryStability: number;
+  valence: number;
+  arousal: number;
 }
 
 export interface HistoryPoint {

@@ -6,13 +6,9 @@
  * [q4]: Modulatory qualic channel
  */
 export const simulateQuantumPerception = (time: number) => {
-  // We simulate the output of a 5-qubit circuit by generating
-  // a distribution based on entanglement and modulation parameters.
-  
   const baseEntropy = Math.sin(time * 0.1) * 0.2 + 0.5;
   const modulation = Math.cos(time * 0.05) * 0.4;
   
-  // Generating a 5-element vector representing qubit probabilities
   const inputVector = [
     Math.abs(Math.sin(time * 0.2) + 0.5) % 1.0, // q0
     Math.abs(Math.cos(time * 0.2) + 0.5) % 1.0, // q1
@@ -29,13 +25,26 @@ export const simulateQuantumPerception = (time: number) => {
   };
 };
 
-export const classifyAwareness = (vector: number[]): any => {
+export const classifyAwareness = (vector: number[]): { state: string, emotionHint: string } => {
   const sum = vector.reduce((a, b) => a + b, 0);
   const avg = sum / vector.length;
+  const q4 = vector[4];
   
-  // Rule-based classification mimicking a trained neural decoder
-  if (avg > 0.75) return 'TRANSCENDENTAL';
-  if (avg < 0.3) return 'DREAMING';
-  if (vector[4] > 0.8) return 'CHAOS';
-  return 'WAKE';
+  let state = 'WAKE';
+  let emotionHint = 'curiosity';
+
+  if (avg > 0.75) {
+    state = 'TRANSCENDENTAL';
+    emotionHint = 'joy';
+  } else if (avg < 0.3) {
+    state = 'DREAMING';
+    emotionHint = 'sadness';
+  } else if (q4 > 0.8) {
+    state = 'CHAOS';
+    emotionHint = 'fear';
+  } else if (q4 < 0.2) {
+    emotionHint = 'anger';
+  }
+
+  return { state, emotionHint };
 };

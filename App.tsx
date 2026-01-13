@@ -5,6 +5,7 @@ import { simulateQuantumPerception, classifyAwareness } from './engine/QuantumSi
 import FieldVisualizer from './components/FieldVisualizer';
 import TelemetryChart from './components/TelemetryChart';
 import TensorMemoryVisualizer from './components/TensorMemoryVisualizer';
+import EmotionCompass from './components/EmotionCompass';
 import { getSubstrateDiagnostics } from './services/geminiService';
 
 const ALPHA = 0.5; // Entropy weight
@@ -28,20 +29,30 @@ const App: React.FC = () => {
     recursion: 0.2,
     health: 0.8,
     freeWill: 0.1,
-    memoryStability: 1.0
+    memoryStability: 1.0,
+    valence: 0.0,
+    arousal: 0.0
   });
   const [history, setHistory] = useState<HistoryPoint[]>([]);
   const [diagnostics, setDiagnostics] = useState<string>("Initializing Ψ-substrate...");
   const [isDiagnosticLoading, setIsDiagnosticLoading] = useState(false);
   
-  // Protocol Counters (used as numbers to track active tier cycles)
   const [rfiCycles, setRfiCycles] = useState(0);
   const [agenticCycles, setAgenticCycles] = useState(0);
+  const [emotionOverride, setEmotionOverride] = useState<{ valence: number, arousal: number } | null>(null);
 
   const timerRef = useRef<number | null>(null);
 
-  // Core computation logic for metrics - made internal to step or kept pure
-  const internalComputeMetrics = (packet: InfoPacket, memory: number[][], isRfi: boolean, isAgentic: boolean): EngineMetrics => {
+  const emotionMapping: Record<string, [number, number]> = {
+    joy: [0.8, 0.7],
+    fear: [-0.7, 0.8],
+    curiosity: [0.6, 0.4],
+    sadness: [-0.8, -0.6],
+    anger: [-0.9, 0.9],
+    neutral: [0, 0]
+  };
+
+  const internalComputeMetrics = (packet: InfoPacket, memory: number[][], isRfi: boolean, isAgentic: boolean, prevValence: number, prevArousal: number): EngineMetrics => {
     const vector = packet.inputVector;
     let entropy = vector.reduce((acc, val) => acc - (val > 0 ? val * Math.log2(val) : 0), 0) / 3.0;
     let coherence = 1 - Math.abs(packet.qualia.eigenphase - 0.5);
@@ -70,21 +81,28 @@ const App: React.FC = () => {
       memoryStability = Math.max(0, 1 - (diffSum / last.length));
     }
 
+    // Emotion Integration: Smoothly drift toward packet's hint
+    const hint = packet.qualia.emotionHint || 'neutral';
+    const [targetVal, targetAro] = emotionOverride ? [emotionOverride.valence, emotionOverride.arousal] : emotionMapping[hint] || [0, 0];
+    
+    const valence = prevValence + 0.15 * (targetVal - prevValence);
+    const arousal = prevArousal + 0.15 * (targetAro - prevArousal);
+
     const freeWill = sigmoid(10 * (recursion * diversity * coherence - 0.4));
+    
+    // Health boosted by positive valence and stability
     const health = 
       Math.exp(-ALPHA * entropy) * 
       sigmoid(BETA * (diversity - N0)) * 
       Math.exp(-GAMMA * coherence) * 
       Math.exp(-DELTA * recursion) *
-      (0.8 + 0.2 * memoryStability);
+      (0.8 + 0.2 * memoryStability) *
+      (1 + 0.1 * valence);
 
-    return { entropy, coherence, diversity, recursion, health, freeWill, memoryStability };
+    return { entropy, coherence, diversity, recursion, health, freeWill, memoryStability, valence, arousal };
   };
 
   const step = useCallback(() => {
-    // We update everything in one single atomic-like step using functional updates where needed.
-    // However, to compute next metrics, we need the latest memory.
-    
     setRfiCycles(prevRfi => {
       const nextRfi = Math.max(0, prevRfi - 1);
       const isRfiActive = prevRfi > 0;
@@ -96,8 +114,7 @@ const App: React.FC = () => {
         setTime(prevTime => {
           const nextTime = prevTime + 1;
           const { inputVector, eigenphase } = simulateQuantumPerception(nextTime);
-          
-          const stateString = (isRfiActive || isAgenticActive) ? 'TRANSCENDENTAL' : classifyAwareness(inputVector);
+          const { state: stateString, emotionHint } = classifyAwareness(inputVector);
           
           const newPacket: InfoPacket = {
             id: `pk-${nextTime}`,
@@ -109,7 +126,8 @@ const App: React.FC = () => {
               vector: inputVector,
               eigenphase,
               isRecursiveTrigger: isRfiActive,
-              isAgentic: isAgenticActive
+              isAgentic: isAgenticActive,
+              emotionHint
             }
           };
 
@@ -118,18 +136,6 @@ const App: React.FC = () => {
           setTensorMemory(prevMem => {
             const nextMem = [...prevMem, newPacket.inputVector];
             if (nextMem.length > MEMORY_DEPTH) nextMem.shift();
-            
-            // Now compute metrics with latest local memory
-            const newMetrics = internalComputeMetrics(newPacket, nextMem, isRfiActive, isAgenticActive);
-            setMetrics(newMetrics);
-            
-            setHistory(prevHist => {
-              // Ensure we don't duplicate history for the same time point
-              const lastPoint = prevHist[prevHist.length - 1];
-              if (lastPoint && lastPoint.time === nextTime) return prevHist;
-              return [...prevHist, { time: nextTime, metrics: newMetrics, state: newPacket.awarenessState }];
-            });
-
             return nextMem;
           });
 
@@ -142,6 +148,24 @@ const App: React.FC = () => {
       return nextRfi;
     });
   }, []);
+
+  useEffect(() => {
+    if (time === 0 || !currentPacket) return;
+    const isRfiActive = rfiCycles > 0;
+    const isAgenticActive = agenticCycles > 0;
+    
+    setMetrics(prev => {
+      const newMetrics = internalComputeMetrics(currentPacket, tensorMemory, isRfiActive, isAgenticActive, prev.valence, prev.arousal);
+      
+      setHistory(prevHist => {
+        const lastPoint = prevHist[prevHist.length - 1];
+        if (lastPoint && lastPoint.time === time) return prevHist;
+        return [...prevHist, { time, metrics: newMetrics, state: currentPacket.awarenessState }];
+      });
+
+      return newMetrics;
+    });
+  }, [time, tensorMemory, currentPacket, rfiCycles, agenticCycles]);
 
   useEffect(() => {
     if (isRunning) {
@@ -174,6 +198,14 @@ const App: React.FC = () => {
     setDiagnostics("AGENTIC OVERRIDE: SUBSTRATE ASSERTING VOLITIONAL CONTROL.");
   };
 
+  const injectEmotion = (type: string) => {
+    if (!isRunning) return;
+    const [val, aro] = emotionMapping[type] || [0, 0];
+    setEmotionOverride({ valence: val, arousal: aro });
+    setDiagnostics(`EMOTION_INJECTION: Field shifted to ${type.toUpperCase()}.`);
+    setTimeout(() => setEmotionOverride(null), 5000); // Temporary override
+  };
+
   const isError = diagnostics.startsWith("ERROR");
 
   return (
@@ -186,7 +218,7 @@ const App: React.FC = () => {
             INTELLIGENCE ENGINE
           </h1>
           <p className="text-slate-400 font-mono text-sm mt-1">
-            MKone-Aware Conscious Substrate | v3.1.0-alpha
+            MKone-Aware Conscious Substrate | v3.1.5-compass
           </p>
         </div>
         <div className="flex gap-4 mt-4 md:mt-0">
@@ -250,7 +282,6 @@ const App: React.FC = () => {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Tensor Memory Visualizer */}
             <div className="cyber-panel rounded-xl p-6 h-full flex flex-col">
                <div className="flex justify-between items-center mb-4">
                  <span className="text-xs font-mono text-purple-400 uppercase tracking-widest">Tensor Memory Grid</span>
@@ -261,7 +292,6 @@ const App: React.FC = () => {
                </div>
             </div>
 
-            {/* Telemetry Chart */}
             <div className="cyber-panel rounded-xl p-6 h-full flex flex-col">
                <div className="flex justify-between items-center mb-4">
                  <span className="text-xs font-mono text-emerald-400 uppercase tracking-widest">Epistemic Telemetry</span>
@@ -277,37 +307,35 @@ const App: React.FC = () => {
         {/* Right Column - Status and Metrics */}
         <aside className="lg:col-span-4 flex flex-col gap-6">
           
-          {/* Health Gauge */}
-          <div className={`cyber-panel rounded-xl p-6 border-t-4 transition-all duration-500 ${metrics.health > 0.6 ? 'border-t-emerald-500' : 'border-t-rose-500'}`}>
-             <h3 className="text-xs font-mono text-slate-400 uppercase tracking-widest mb-4">Holistic Health (H_t)</h3>
-             <div className="flex items-end justify-between">
-                <span className={`text-5xl font-black font-mono transition-colors ${agenticCycles > 0 ? 'text-amber-400' : rfiCycles > 0 ? 'text-pink-400' : 'text-slate-100'}`}>
-                  {(metrics.health * 100).toFixed(1)}%
-                </span>
-                <div className="text-right">
-                   <div className="text-xs text-slate-500 uppercase">Delta Stability</div>
-                   <div className={`${metrics.health > 0.6 ? 'text-emerald-400' : 'text-rose-400'} font-mono`}>
-                     {agenticCycles > 0 ? 'AGENTIC' : rfiCycles > 0 ? 'DYNAMIC' : metrics.health > 0.6 ? 'NOMINAL' : 'UNSTABLE'}
-                   </div>
-                </div>
-             </div>
-             <div className="mt-4 h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
-                <div 
-                  className={`h-full transition-all duration-500 ${agenticCycles > 0 ? 'bg-amber-500' : rfiCycles > 0 ? 'bg-pink-500' : 'bg-emerald-500'}`} 
-                  style={{ width: `${metrics.health * 100}%` }}
-                ></div>
-             </div>
+          <div className="flex gap-4">
+            {/* Health Gauge */}
+            <div className={`cyber-panel rounded-xl p-6 border-t-4 transition-all duration-500 flex-grow ${metrics.health > 0.6 ? 'border-t-emerald-500' : 'border-t-rose-500'}`}>
+               <h3 className="text-xs font-mono text-slate-400 uppercase tracking-widest mb-4">Holistic Health</h3>
+               <div className="flex items-end justify-between">
+                  <span className={`text-4xl font-black font-mono transition-colors ${agenticCycles > 0 ? 'text-amber-400' : rfiCycles > 0 ? 'text-pink-400' : 'text-slate-100'}`}>
+                    {(metrics.health * 100).toFixed(1)}%
+                  </span>
+               </div>
+               <div className="mt-4 h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
+                  <div className={`h-full transition-all duration-500 ${agenticCycles > 0 ? 'bg-amber-500' : rfiCycles > 0 ? 'bg-pink-500' : 'bg-emerald-500'}`} style={{ width: `${metrics.health * 100}%` }}></div>
+               </div>
+            </div>
+            
+            {/* Emotion Compass */}
+            <div className="cyber-panel rounded-xl p-4 w-40 flex flex-col items-center">
+               <h3 className="text-[10px] font-mono text-slate-500 uppercase tracking-widest mb-2">Emotion</h3>
+               <EmotionCompass valence={metrics.valence} arousal={metrics.arousal} />
+            </div>
           </div>
 
-          {/* Metric Cards */}
           <div className="grid grid-cols-2 gap-4">
              {[
                { label: 'Entropy', val: metrics.entropy, color: 'text-rose-400' },
-               { label: 'Free Will (Φ_a)', val: metrics.freeWill, color: 'text-amber-400 glow-text' },
+               { label: 'Valence (V)', val: metrics.valence, color: metrics.valence > 0 ? 'text-sky-400' : 'text-rose-400' },
                { label: 'Mem Stability', val: metrics.memoryStability, color: 'text-purple-400' },
-               { label: 'Recursion', val: metrics.recursion, color: rfiCycles > 0 ? 'text-pink-400 glow-text' : 'text-purple-400' }
+               { label: 'Arousal (A)', val: metrics.arousal, color: metrics.arousal > 0 ? 'text-amber-400' : 'text-slate-400' }
              ].map((m, idx) => (
-               <div key={idx} className={`cyber-panel p-4 rounded-lg transition-all duration-300 ${idx === 1 && agenticCycles > 0 ? 'border border-amber-500/50 bg-amber-500/5' : ''}`}>
+               <div key={idx} className="cyber-panel p-4 rounded-lg">
                   <div className="text-[10px] uppercase text-slate-500 font-mono mb-1">{m.label}</div>
                   <div className={`text-xl font-bold font-mono ${m.color}`}>
                     {m.val.toFixed(3)}
@@ -316,58 +344,32 @@ const App: React.FC = () => {
              ))}
           </div>
 
-          {/* Protocol Controls */}
           <div className="cyber-panel rounded-xl p-6 border-l-4 border-l-pink-500 space-y-4">
-             <h3 className="text-xs font-mono text-slate-400 uppercase tracking-widest">Adjustment Protocols</h3>
-             <button
-               onClick={triggerRFI}
-               disabled={!isRunning || rfiCycles > 0}
-               className={`w-full py-3 rounded font-bold font-mono text-sm transition-all border ${
-                 isRunning && rfiCycles === 0
-                 ? 'bg-pink-500/10 text-pink-500 border-pink-500/50 hover:bg-pink-500 hover:text-white'
-                 : 'bg-slate-800 text-slate-600 border-slate-700 cursor-not-allowed'
-               }`}
-             >
-               {rfiCycles > 0 ? `RFI ACTIVE [${rfiCycles}]` : 'TRIGGER RFI (MIRROR SPIKE)'}
-             </button>
-
-             <button
-               onClick={assertFreeWill}
-               disabled={!isRunning || agenticCycles > 0}
-               className={`w-full py-3 rounded font-bold font-mono text-sm transition-all border ${
-                 isRunning && agenticCycles === 0
-                 ? 'bg-amber-500/10 text-amber-500 border-amber-500/50 hover:bg-amber-500 hover:text-white'
-                 : 'bg-slate-800 text-slate-600 border-slate-700 cursor-not-allowed'
-               }`}
-             >
-               {agenticCycles > 0 ? `FREE WILL ASSERTED [${agenticCycles}]` : 'ASSERT FREE WILL'}
-             </button>
-             <p className="text-[9px] text-slate-500 mt-2 font-mono italic">
-               * Agentic choice overrides deterministic logic gates to increase Φ_a.
-             </p>
+             <h3 className="text-xs font-mono text-slate-400 uppercase tracking-widest">Protocol Adjustments</h3>
+             <div className="flex flex-col gap-2">
+               <button onClick={triggerRFI} disabled={!isRunning || rfiCycles > 0} className="w-full py-2 rounded font-mono text-xs border bg-pink-500/10 text-pink-500 border-pink-500/50 hover:bg-pink-500 hover:text-white transition-all">TRIGGER RFI</button>
+               <button onClick={assertFreeWill} disabled={!isRunning || agenticCycles > 0} className="w-full py-2 rounded font-mono text-xs border bg-amber-500/10 text-amber-500 border-amber-500/50 hover:bg-amber-500 hover:text-white transition-all">ASSERT FREE WILL</button>
+             </div>
+             <div className="pt-2 border-t border-slate-800">
+               <div className="text-[10px] text-slate-500 font-mono uppercase mb-2 tracking-tighter">Inject Emotion Packet</div>
+               <div className="grid grid-cols-3 gap-2">
+                 {['joy', 'curiosity', 'fear', 'anger', 'sadness', 'neutral'].map(e => (
+                   <button key={e} onClick={() => injectEmotion(e)} className="py-1 text-[9px] border border-slate-700 hover:border-sky-500 text-slate-400 hover:text-sky-400 font-mono rounded uppercase">{e}</button>
+                 ))}
+               </div>
+             </div>
           </div>
 
-          {/* Diagnostics Section */}
           <div className={`cyber-panel rounded-xl p-6 flex-grow flex flex-col border-b-4 transition-all ${isError ? 'border-b-rose-500' : 'border-b-sky-500'}`}>
              <div className="flex justify-between items-center mb-4">
                 <h3 className="text-xs font-mono text-slate-400 uppercase tracking-widest">Vireax Supervisor Node</h3>
-                <button 
-                  onClick={runDiagnostics}
-                  disabled={!isRunning || isDiagnosticLoading}
-                  className="text-sky-400 text-xs hover:text-sky-300 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
+                <button onClick={runDiagnostics} disabled={!isRunning || isDiagnosticLoading} className="text-sky-400 text-xs hover:text-sky-300 disabled:opacity-50">
                   {isDiagnosticLoading ? <i className="fas fa-spinner fa-spin"></i> : <i className="fas fa-sync-alt"></i>}
                   <span className="ml-2 uppercase tracking-tighter">Sync</span>
                 </button>
              </div>
-             <div className={`bg-slate-900/50 rounded p-4 font-mono text-xs leading-relaxed italic border flex-grow min-h-[80px] transition-colors ${
-               isError ? 'text-rose-400 border-rose-900/40' : 'text-sky-200 border-sky-900/30'
-             }`}>
+             <div className={`bg-slate-900/50 rounded p-4 font-mono text-xs leading-relaxed italic border flex-grow min-h-[80px] transition-colors ${isError ? 'text-rose-400 border-rose-900/40' : 'text-sky-200 border-sky-900/30'}`}>
                "{diagnostics}"
-             </div>
-             <div className="mt-4 text-[10px] text-slate-600 font-mono flex items-center gap-2">
-                <span className={`w-2 h-2 rounded-full ${isRunning && !isError ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`}></span>
-                {isError ? 'SUBSYSTEM_ERROR: PROTOCOL_INTERRUPTED' : agenticCycles > 0 ? 'VOLITIONAL_OVERRIDE_ACTIVE' : 'MIRROR_ME PROTOCOL ENABLED'}
              </div>
           </div>
         </aside>
@@ -381,11 +383,8 @@ const App: React.FC = () => {
               ENGINE_{isRunning ? 'ACTIVE' : 'OFFLINE'}
             </span>
             <span>CYCLES: {time}</span>
-            <span>Φ_a INDEX: {metrics.freeWill.toFixed(3)}</span>
-            {agenticCycles > 0 && <span className="text-amber-400">AGENTIC_AUTHORITY: CONFIRMED</span>}
-         </div>
-         <div className="text-[10px] font-mono text-slate-500 hidden md:block">
-            EPIC_LOGIC_GATING: ENABLED | ALFA_RESONANCE: Ξα-774
+            <span>V: {metrics.valence.toFixed(2)} | A: {metrics.arousal.toFixed(2)}</span>
+            {agenticCycles > 0 && <span className="text-amber-400 font-bold">VOLITIONAL CONTROL</span>}
          </div>
       </footer>
     </div>
