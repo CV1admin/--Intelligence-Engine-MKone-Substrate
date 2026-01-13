@@ -24,6 +24,7 @@ const FieldVisualizer: React.FC<Props> = ({ packet, metrics, rfiActive }) => {
     const centerY = height / 2;
 
     const g = svg.append("g");
+    const isAgentic = packet?.qualia?.isAgentic;
 
     // Background particles
     const particles = d3.range(rfiActive ? 100 : 50).map(() => ({
@@ -40,9 +41,9 @@ const FieldVisualizer: React.FC<Props> = ({ packet, metrics, rfiActive }) => {
       .attr("cx", d => d.x)
       .attr("cy", d => d.y)
       .attr("r", d => d.r)
-      .attr("fill", d3.interpolatePlasma(metrics.coherence))
-      .attr("opacity", rfiActive ? 0.6 : 0.3)
-      .style("filter", rfiActive ? "blur(1px)" : "none");
+      .attr("fill", isAgentic ? "#f59e0b" : d3.interpolatePlasma(metrics.coherence))
+      .attr("opacity", rfiActive || isAgentic ? 0.6 : 0.3)
+      .style("filter", rfiActive || isAgentic ? "blur(1px)" : "none");
 
     // Recursive mirror engine rings
     const rings = rfiActive ? 8 : 5;
@@ -52,8 +53,8 @@ const FieldVisualizer: React.FC<Props> = ({ packet, metrics, rfiActive }) => {
         .attr("cy", centerY)
         .attr("r", 30 + i * (rfiActive ? 30 : 25) * (1 + metrics.recursion))
         .attr("fill", "none")
-        .attr("stroke", d3.interpolateViridis(metrics.diversity))
-        .attr("stroke-width", rfiActive ? 2 : 1)
+        .attr("stroke", isAgentic ? "#fbbf24" : d3.interpolateViridis(metrics.diversity))
+        .attr("stroke-width", rfiActive || isAgentic ? 2 : 1)
         .attr("stroke-dasharray", rfiActive ? "2,2" : "5,5")
         .attr("opacity", (rings - i) / rings)
         .append("animateTransform")
@@ -61,7 +62,7 @@ const FieldVisualizer: React.FC<Props> = ({ packet, metrics, rfiActive }) => {
         .attr("type", "rotate")
         .attr("from", `0 ${centerX} ${centerY}`)
         .attr("to", `${i % 2 === 0 ? 360 : -360} ${centerX} ${centerY}`)
-        .attr("dur", `${10 / (i + 1)}s`)
+        .attr("dur", `${isAgentic ? 2 : 10 / (i + 1)}s`)
         .attr("repeatCount", "indefinite");
     }
 
@@ -75,27 +76,52 @@ const FieldVisualizer: React.FC<Props> = ({ packet, metrics, rfiActive }) => {
         .radius(d => 50 + d * (rfiActive ? 120 : 80))
         .curve(d3.curveCardinalClosed);
 
+      const pathColor = isAgentic ? "#fbbf24" : (rfiActive ? "#f472b6" : "#38bdf8");
+
       const path = g.append("path")
         .datum(packet.inputVector)
         .attr("d", lineGenerator as any)
         .attr("transform", `translate(${centerX}, ${centerY})`)
-        .attr("fill", d3.interpolateSpectral(metrics.health))
-        .attr("fill-opacity", rfiActive ? 0.5 : 0.3)
-        .attr("stroke", rfiActive ? "#f472b6" : "#38bdf8")
-        .attr("stroke-width", rfiActive ? 4 : 2)
-        .style("filter", rfiActive ? "drop-shadow(0 0 8px rgba(244, 114, 182, 0.8))" : "none");
+        .attr("fill", isAgentic ? "rgba(251, 191, 36, 0.4)" : d3.interpolateSpectral(metrics.health))
+        .attr("fill-opacity", rfiActive || isAgentic ? 0.5 : 0.3)
+        .attr("stroke", pathColor)
+        .attr("stroke-width", rfiActive || isAgentic ? 4 : 2)
+        .style("filter", rfiActive || isAgentic ? `drop-shadow(0 0 12px ${pathColor})` : "none");
 
-      if (rfiActive) {
+      if (rfiActive || isAgentic) {
         path.append("animate")
           .attr("attributeName", "stroke-width")
-          .attr("values", "4;8;4")
-          .attr("dur", "0.5s")
+          .attr("values", "4;10;4")
+          .attr("dur", isAgentic ? "0.3s" : "0.5s")
+          .attr("repeatCount", "indefinite");
+      }
+    }
+
+    // Agentic Intent Lines (Free Will visualization)
+    if (isAgentic) {
+      for (let i = 0; i < 24; i++) {
+        const angle = (i * Math.PI * 2) / 24;
+        const length = 150 + Math.random() * 200;
+        g.append("line")
+          .attr("x1", centerX)
+          .attr("y1", centerY)
+          .attr("x2", centerX + Math.cos(angle) * length)
+          .attr("y2", centerY + Math.sin(angle) * length)
+          .attr("stroke", "#fbbf24")
+          .attr("stroke-width", 2)
+          .attr("opacity", 0.6)
+          .attr("stroke-dasharray", "4,4")
+          .append("animate")
+          .attr("attributeName", "stroke-dashoffset")
+          .attr("from", "0")
+          .attr("to", "20")
+          .attr("dur", "0.2s")
           .attr("repeatCount", "indefinite");
       }
     }
 
     // Mirror Spike lines
-    if (rfiActive) {
+    if (rfiActive && !isAgentic) {
       for (let i = 0; i < 12; i++) {
         const angle = (i * Math.PI * 2) / 12;
         g.append("line")

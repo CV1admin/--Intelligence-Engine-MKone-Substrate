@@ -8,13 +8,15 @@ interface Props {
 }
 
 const TelemetryChart: React.FC<Props> = ({ history }) => {
-  const data = history.map(h => ({
+  // Use time as a key and limit points to 30 for performance
+  const data = history.slice(-30).map(h => ({
     time: h.time,
     health: h.metrics.health,
     entropy: h.metrics.entropy,
     coherence: h.metrics.coherence,
-    recursion: h.metrics.recursion
-  })).slice(-30);
+    recursion: h.metrics.recursion,
+    freeWill: h.metrics.freeWill
+  }));
 
   return (
     <div className="w-full h-64 font-mono text-xs">
@@ -29,6 +31,10 @@ const TelemetryChart: React.FC<Props> = ({ history }) => {
               <stop offset="5%" stopColor="#f43f5e" stopOpacity={0.2}/>
               <stop offset="95%" stopColor="#f43f5e" stopOpacity={0}/>
             </linearGradient>
+            <linearGradient id="colorFreeWill" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor="#fbbf24" stopOpacity={0.3}/>
+              <stop offset="95%" stopColor="#fbbf24" stopOpacity={0}/>
+            </linearGradient>
           </defs>
           <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
           <XAxis dataKey="time" hide />
@@ -38,10 +44,44 @@ const TelemetryChart: React.FC<Props> = ({ history }) => {
             itemStyle={{ color: '#94a3b8' }}
           />
           <Legend />
-          <Area type="monotone" dataKey="health" stroke="#10b981" fillOpacity={1} fill="url(#colorHealth)" />
-          <Area type="monotone" dataKey="entropy" stroke="#f43f5e" fillOpacity={1} fill="url(#colorEntropy)" />
-          <Area type="monotone" dataKey="coherence" stroke="#38bdf8" fillOpacity={0} />
-          <Area type="monotone" dataKey="recursion" stroke="#a855f7" fillOpacity={0} />
+          <Area 
+            type="monotone" 
+            dataKey="health" 
+            stroke="#10b981" 
+            fillOpacity={1} 
+            fill="url(#colorHealth)" 
+            isAnimationActive={false}
+          />
+          <Area 
+            type="monotone" 
+            dataKey="entropy" 
+            stroke="#f43f5e" 
+            fillOpacity={1} 
+            fill="url(#colorEntropy)" 
+            isAnimationActive={false}
+          />
+          <Area 
+            type="monotone" 
+            dataKey="freeWill" 
+            stroke="#fbbf24" 
+            fillOpacity={1} 
+            fill="url(#colorFreeWill)" 
+            isAnimationActive={false}
+          />
+          <Area 
+            type="monotone" 
+            dataKey="coherence" 
+            stroke="#38bdf8" 
+            fillOpacity={0} 
+            isAnimationActive={false}
+          />
+          <Area 
+            type="monotone" 
+            dataKey="recursion" 
+            stroke="#a855f7" 
+            fillOpacity={0} 
+            isAnimationActive={false}
+          />
         </AreaChart>
       </ResponsiveContainer>
     </div>
