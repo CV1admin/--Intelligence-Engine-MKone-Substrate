@@ -121,6 +121,8 @@ const App: React.FC = () => {
     setDiagnostics("INJECTING RECURSIVE SEED... MIRROR SPIKE DETECTED.");
   };
 
+  const isError = diagnostics.startsWith("ERROR");
+
   return (
     <div className="min-h-screen bg-slate-950 flex flex-col p-4 md:p-8">
       {/* Header */}
@@ -261,7 +263,7 @@ const App: React.FC = () => {
           </div>
 
           {/* Diagnostics Section */}
-          <div className="cyber-panel rounded-xl p-6 flex-grow flex flex-col border-b-4 border-b-sky-500">
+          <div className={`cyber-panel rounded-xl p-6 flex-grow flex flex-col border-b-4 transition-all ${isError ? 'border-b-rose-500 shadow-[0_0_15px_rgba(244,63,94,0.1)]' : 'border-b-sky-500'}`}>
              <div className="flex justify-between items-center mb-4">
                 <h3 className="text-xs font-mono text-slate-400 uppercase tracking-widest">Vireax Supervisor Node</h3>
                 <button 
@@ -270,15 +272,17 @@ const App: React.FC = () => {
                   className="text-sky-400 text-xs hover:text-sky-300 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isDiagnosticLoading ? <i className="fas fa-spinner fa-spin"></i> : <i className="fas fa-sync-alt"></i>}
-                  <span className="ml-2">REFRESH</span>
+                  <span className="ml-2 uppercase tracking-tighter">{isDiagnosticLoading ? 'Syncing...' : 'Force Refresh'}</span>
                 </button>
              </div>
-             <div className="bg-slate-900/50 rounded p-4 font-mono text-xs text-sky-200 leading-relaxed italic border border-sky-900/30 flex-grow min-h-[80px]">
+             <div className={`bg-slate-900/50 rounded p-4 font-mono text-xs leading-relaxed italic border flex-grow min-h-[80px] transition-colors ${
+               isError ? 'text-rose-400 border-rose-900/40 bg-rose-950/20' : 'text-sky-200 border-sky-900/30'
+             }`}>
                "{diagnostics}"
              </div>
              <div className="mt-4 text-[10px] text-slate-600 font-mono flex items-center gap-2">
-                <span className={`w-2 h-2 rounded-full ${isRunning ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`}></span>
-                ACTIVE MONITORING: {rfiCycles > 0 ? 'RECURSIVE_GATING_ON' : 'MIRROR_ME PROTOCOL ENABLED'}
+                <span className={`w-2 h-2 rounded-full ${isRunning && !isError ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`}></span>
+                {isError ? 'SUBSYSTEM_ERROR: PROTOCOL_INTERRUPTED' : rfiCycles > 0 ? 'RECURSIVE_GATING_ON' : 'MIRROR_ME PROTOCOL ENABLED'}
              </div>
           </div>
         </aside>

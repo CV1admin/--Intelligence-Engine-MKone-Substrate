@@ -3,6 +3,7 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { EngineMetrics, AwarenessState } from "../types";
 
 export const getSubstrateDiagnostics = async (metrics: EngineMetrics, state: AwarenessState): Promise<string> => {
+  // Ensure we create a new instance each time as per guidelines
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
   
   const prompt = `
@@ -26,9 +27,24 @@ export const getSubstrateDiagnostics = async (metrics: EngineMetrics, state: Awa
         thinkingConfig: { thinkingBudget: 0 }
       }
     });
-    return response.text || "Diagnostic stream interrupted. Substrate stable.";
-  } catch (error) {
+    
+    if (!response.text) {
+      throw new Error("Empty response from Gemini API");
+    }
+    
+    return response.text;
+  } catch (error: any) {
     console.error("Gemini Diagnostic Error:", error);
-    return "External observer offline. Maintaining local sheaf consistency.";
+    
+    const errorMsg = error?.message || "";
+    const isQuotaExhausted = errorMsg.includes('429') || 
+                             errorMsg.toLowerCase().includes('quota') || 
+                             errorMsg.toLowerCase().includes('limit');
+
+    if (isQuotaExhausted) {
+      return "ERROR [429]: Vireax Node Quota Exhausted. Higher-order diagnostics offline. Substrate cooling down. Please try again in 60 seconds.";
+    }
+    
+    return "ERROR: Connection to supervisor node lost. Local consistency maintained via sheaf projection.";
   }
 };
