@@ -18,3 +18,4 @@ View your app in AI Studio: https://ai.studio/apps/drive/17EtbbdvAMu9DbFxrtdpg8r
 2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
 3. Run the app:
    `npm run dev`
+\n\n## System validation status\n\nSee [SYSTEM_IMPROVEMENTS.md](SYSTEM_IMPROVEMENTS.md) for the tested MKONE, ThinLineEngine, MK3A and Irreducible Intelligence improvements. Current results demonstrate coordinated capability and resilient routing; general irreducible intelligence is not demonstrated.\n
