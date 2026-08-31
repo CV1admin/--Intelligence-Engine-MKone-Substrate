@@ -1,21 +1,36 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# MKone Intelligence Engine Substrate
 
-# Run and deploy your AI Studio app
+Research interface for MKONE routing, ThinLine evidence boundaries, MK3A provenance concepts, and a simulator-backed quantum-classical feature layer.
 
-This contains everything you need to run your app locally.
+## Quantum-AI v1.4
 
-View your app in AI Studio: https://ai.studio/apps/drive/17EtbbdvAMu9DbFxrtdpg8rXC56hWkMLK
+The repository includes a small exact TypeScript statevector simulator:
 
-## Run Locally
+```text
+classical features -> H -> RY encoding -> CNOT chain -> <Z(q0)>
+```
 
-**Prerequisites:**  Node.js
+This is quantum-circuit simulation on a classical CPU. It is not physical QPU execution and does not establish quantum advantage or general irreducible intelligence.
 
+See:
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
-\n\n## System validation status\n\nSee [SYSTEM_IMPROVEMENTS.md](SYSTEM_IMPROVEMENTS.md) for the tested MKONE, ThinLineEngine, MK3A and Irreducible Intelligence improvements. Current results demonstrate coordinated capability and resilient routing; general irreducible intelligence is not demonstrated.\n
+- [Quantum-AI v1.4 design](research/QUANTUM_AI_HYBRID_V1.4.md)
+- [Repository evidence status](research/EVIDENCE_STATUS_V1.4.md)
+- [QPU adapter acceptance specification](research/QPU_ADAPTER_SPEC.md)
+- [System improvements](SYSTEM_IMPROVEMENTS.md)
+
+## Local verification
+
+Prerequisites: Node.js 22.
+
+```bash
+npm install --ignore-scripts
+npm run build
+npm test
+```
+
+The test suite verifies the TypeScript simulator path only. Claims about the separate FastAPI stack, finite-shot provenance, ML-DSA-65 signatures, and the historical 26-test benchmark are not reproducible from this repository at present.
+
+## Optional AI Studio interface
+
+The dashboard can use a Gemini API key through `.env.local`. Quantum simulator verification does not require that credential.
