@@ -1,23 +1,25 @@
 {
-  "name": "ψ-intelligence-engine:-mkone-substrate",
+  "name": "mkone-intelligence-engine-substrate",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.4.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "tsx --test tests/**/*.test.ts"
   },
   "dependencies": {
-    "react": "^19.0.0",
-    "recharts": "2.15.0",
-    "react-dom": "^19.0.0",
     "@google/genai": "^1.35.0",
-    "d3": "^7.9.0"
+    "d3": "^7.9.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "recharts": "2.15.0"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",
     "@vitejs/plugin-react": "^5.0.0",
+    "tsx": "^4.20.5",
     "typescript": "~5.8.2",
     "vite": "^6.2.0"
   }
